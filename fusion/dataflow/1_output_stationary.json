@@ -1,0 +1,5 @@
+{
+  "dataflow": "OS",
+  "partitioning_size": [32, 32],
+  "unroll_loop": [3, 5]
+}

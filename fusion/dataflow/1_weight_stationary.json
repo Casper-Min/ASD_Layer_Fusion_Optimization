@@ -1,0 +1,5 @@
+{
+  "dataflow": "WS",
+  "partitioning_size": [32, 32],
+  "unroll_loop": [2, 5]
+}
