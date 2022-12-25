@@ -19,5 +19,5 @@ scipy==1.4.0
 
 ### Reminder ###
 1. Simple per iteration bandwidth/execution cycle based performance model is applied
-2. Timeloop Wraper + Cost Model is excluded from soruce code due to build/dependency issue
-3. If you are looking for Timeloop Wraper + Cost Model, Plz send e-mail to ycivil93@hanyang.ac.kr
+2. Timeloop Wraper + Cost Model is excluded from source code due to build/dependency issue
+3. If you are looking for Timeloop Wraper + Cost Model, send e-mail to ycivil93@hanyang.ac.kr
