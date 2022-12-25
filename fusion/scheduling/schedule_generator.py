@@ -49,7 +49,8 @@ class ScheduleGenerator(object):
         self.wofusion_optimus = wofusion_optimus
         self.timeloop_cost_model = timeloop_cost_model
         self.simple_cost_model = 1
-
+        self.debug_msg = False
+        
     def schedule_search(self):
 
         if self.z_fusion or self.d_fusion or self.wofusion:
@@ -68,7 +69,6 @@ class ScheduleGenerator(object):
                     cost, loop_block, loop_order, vertex_list, sfil_fit = self._find_schedule([layer])
                     schedule_single_layer += [[vertex_list, loop_block, loop_order, cost, sfil_fit]]
                     cost_single_layer += cost
-                # print(schedule_single_layer,cost_single_layer)
                 res_map, res = schedule_single_layer , cost_single_layer
             else :
                 if len(self.network.firsts()) > 1:
@@ -102,15 +102,13 @@ class ScheduleGenerator(object):
                 schedule, g_cost = dptable[dpkey]
                 vertex_list, loop_block, loop_order, cost, sfil_fit = self._find_schedule(g)
                 if g_cost == float("inf"):
-                    print(g ,"impossible to fusion")
-                    print()
+                    print(g ,"impossible to fusion\n")
                     return dptable[dpkey]
             else :
                 g_cost, loop_block, loop_order, vertex_list, sfil_fit = self._find_schedule(g)
                 if g_cost == float("inf"):
                     dptable[dpkey] = [[]], float("inf")
-                    print(g ,"impossible to fusion")
-                    print()
+                    print(g ,"impossible to fusion\n")
                     return dptable[dpkey]
                 else :
                     dptable[dpkey] = [[vertex_list, loop_block, loop_order, g_cost, sfil_fit]], g_cost
@@ -262,13 +260,13 @@ class ScheduleGenerator(object):
 
         loop_lower_bound = self.loop_lower_bound(layer)
 
-        # if self.dataflow == 'OS' :
-        #     if layer.wofm < self.resource.array_width :
-        #         padded_hofm = int(math.ceil(layer.wofm*layer.wofm/self.resource.array_width))
-        #         padded_wofm = self.resource.array_width 
-        #         padded_layer = ConvLayer(layer.nifm, layer.nofm, [padded_hofm, padded_wofm] ,sfil=[layer.hfil,layer.wfil],strd=[layer.hstd, layer.wstd], nimg=layer.nimg)
-        #         layer = padded_layer
-        #         loop_lower_bound = self.loop_lower_bound(layer)
+        if self.dataflow == 'OS' :
+            if layer.wofm < self.resource.array_width :
+                padded_hofm = int(math.ceil(layer.wofm*layer.wofm/self.resource.array_width))
+                padded_wofm = self.resource.array_width 
+                padded_layer = ConvLayer(layer.nifm, layer.nofm, [padded_hofm, padded_wofm] ,sfil=[layer.hfil,layer.wfil],strd=[layer.hstd, layer.wstd], nimg=layer.nimg)
+                layer = padded_layer
+                loop_lower_bound = self.loop_lower_bound(layer)
         
         count = 0
         for scheduling in _unilayer_schedule_list_v2:
@@ -284,7 +282,8 @@ class ScheduleGenerator(object):
             cost_t = int(cost_t) if cost_t != float('inf') else cost_t
 
             if cost_t != float('inf') :
-                # print(" DRAM-Buffer Mapping:", loop_block_t, loop_order_t, self.mapping_t, "Optimus Simple:", cost_t)
+                if self.debug_msg : 
+                    print(" DRAM-Buffer Mapping:", loop_block_t, loop_order_t, self.mapping_t, "Optimus Simple:", cost_t)
                 
                 if self.simple_cost_model :
                     cost_inner_list, point_list = self.mapping_timeloop([g],[loop_block_t],[loop_order_t])
@@ -300,31 +299,22 @@ class ScheduleGenerator(object):
                     READ_CYCLE = int((Input_Size + Weight_Size + Output_Read_Size)//self.DRAM_BW)
                     WRITE_CYCLE = int((Output_Write_Size)//self.DRAM_BW)
                     Result_Cycle = max(Execution_Cycle,READ_CYCLE,WRITE_CYCLE)
-                    # print(DRAM_access)
-                    # print(Execution_Cycle, READ_CYCLE, WRITE_CYCLE, Result_Cycle)
+                    if self.debug_msg : 
+                        print(DRAM_access)
+                        print(Execution_Cycle, READ_CYCLE, WRITE_CYCLE, Result_Cycle)
                 else:
                     cost_inner_list, point_list = self.mapping_timeloop([g],[loop_block_t],[loop_order_t])
                     DRAM_access = self.cost_model.get_level_access_unilayer_and_innerlevel(point_list, [g], 2)
                     Result_Cycle, access = self.res_parse_timeloop([[g],[loop_block_t],[loop_order_t],cost_t,self.sfil_fit])
-                    # print(DRAM_access)
-                cost_timeloop_t = Result_Cycle
+                    if self.debug_msg : 
+                        print(DRAM_access)
                 
-                
-                # access_list, levels_cost, noc_cost, ops, cost = self.cost_model.get_cost(point_list, [g], self.sfil_fit)
-                # self.H_recompute = [loop_block_t[4]]
-                # self.H_reuse, self.H_epilogue_recompute, self.H_epilogue_reuse = [0],[0],[0]
-                # cost_inner_list, point_list = self.mapping_timeloop([g], [loop_block_t], [loop_order_t])
-                # cost_t2 = sum(cost_inner_list)
-                # access_list, levels_cost, noc_cost, ops, cost_t1 = self.cost_model.get_cost(point_list, [g], self.sfil_fit)
-                    
-                # print("  DRAM->Buffer Result", self.mapping_t, "Timeloop:", cost_t2, "Optimus:",cost_t1)
-                # if cost_t2 < cost_timeloop:
-                #     mapping, cost_initial, cost_optimus, cost_timeloop, loop_block, loop_order = self.mapping_t, cost_t, cost_t1, cost_t2, loop_block_t, loop_order_t
-                if Result_Cycle < cost:
+                cost_timeloop_t = Result_Cycle 
+                if cost_timeloop_t < cost:
                     mapping, cost_initial, cost_optimus, cost_timeloop, loop_block, loop_order = self.mapping_t, cost_t, cost_optimus_t, cost_timeloop_t, loop_block_t, loop_order_t
         # cost = cost_initial
         cost = cost_timeloop         
-        print("Single Layer Schedule:", mapping, loop_block, "Timeloop Cost:", cost_timeloop)
+        print("Optimal Result: - Mapping:", mapping, loop_block, "Performance Cost:", cost_timeloop)
 
         return cost, [loop_block], [loop_order], self.sfil_fit
     
@@ -353,10 +343,12 @@ class ScheduleGenerator(object):
                 cost_t, loop_block_t, loop_order_t, glb_access_cost_t, dram_access_cost_t \
                     = scheduling(layer, self.resource, loop_lower_bound)
                 if cost_t != float('inf') :
-                    print(g, cost_t, loop_block_t, loop_order_t, dram_access_cost_t)
+                    if self.debug_msg :
+                        print(g, cost_t, loop_block_t, loop_order_t, dram_access_cost_t)
                 if cost_t < cost:
                     cost, loop_block, loop_order = cost_t, loop_block_t, loop_order_t
 
+        print("Optimal Result:",g, loop_block, "Cost:", cost)
         return cost, [loop_block], [loop_order], is_filter_fit
 
     def _find_uni_layer_schedule_others(self, g, mode):
@@ -447,7 +439,7 @@ class ScheduleGenerator(object):
             for candidate_layers_body in vertex_list :
                 if (candidate_layers_body not in self.heads) and (candidate_layers_body not in self.tails) and (candidate_layers_body not in self.singles) :
                     self.bodys.append(candidate_layers_body)
-                    
+            
             print("Multi Layer Schedule", fusion_group ,"-> Head :" , self.heads , ", Body :" , self.bodys , ", Tail :" , self.tails , ", Single :" , self.singles)
             
             for overlap_reuse in [True, False] :
@@ -471,8 +463,8 @@ class ScheduleGenerator(object):
                         weight_size = self.batch_tile_num * sum(weight_size_list)
                         output_size = self.batch_tile_num * sum(output_size_list) 
                         ops_count = self.batch_tile_num * sum(ops_count_list)
-                        # print(vertex_list, overlap_reuse, weight_reuse , "Analytic Cost:",cost_timeloop , round(cost_ideal/cost_timeloop,3) , 'I/W/O:', input_size/1024 , weight_size/1024 , output_size/1024, (input_size+weight_size+output_size)/1024)
-                        # print()
+                        if self.debug_msg : 
+                            print(vertex_list, "Reuse(Overlap/Weight):", overlap_reuse, weight_reuse , "Performance Cost:",cost_timeloop , round(cost_ideal/cost_timeloop,3) , 'I/W/O:', input_size/1024 , weight_size/1024 , output_size/1024, (input_size+weight_size+output_size)/1024,'\n')
                         if cost_timeloop < cost :
                             cost = cost_timeloop
                             overlap_reuse_t = overlap_reuse
@@ -484,17 +476,25 @@ class ScheduleGenerator(object):
             if cost == float('inf') :
                 return float('inf'), None, None, None, False
             else :
-                print("Multi Layer Schedule", vertex_list, overlap_reuse_t, weight_reuse_t , "Analytic Cost:",cost , 'I/W/O:', input_size_t/1024 , weight_size_t/1024 , output_size_t/1024 , (input_size_t+weight_size_t+output_size_t)/1024 )
+                print(" Optimal Result: - Reuse(Overlap/Weight):", overlap_reuse_t, weight_reuse_t , ", Performance Cost:",cost , ', Access(I/W/O/Total, KB):', input_size_t/1024 , weight_size_t/1024 , output_size_t/1024 , (input_size_t+weight_size_t+output_size_t)/1024)
         else :
             ilr = InterLayerReuse(self.network, fusion_group, self.resource, self.dataflow, self.loop_lower_bound,
                                 z_fusion=self.z_fusion, d_fusion=self.d_fusion, womincost=self.womincost)
-            # ilr.sched(mode)
-            ilr.sched_timeloop_cost_model(True,True)
+            
             if not ilr.valid or self.wofusion:
                 return float('inf'), None, None, None, False
-            else:
+
+            ilr.sched_timeloop_cost_model(True,True)
+            
+            if not ilr.valid : 
+                ilr.sched_timeloop_cost_model(True,False)
+
+            if not ilr.valid :
+                return float('inf'), None, None, None, False
+            else :
                 cost, loop_block, loop_order, vertex_list = ilr.q, ilr.loop_block, ilr.loop_order, ilr.dag_vertex_list
-                print(fusion_group,cost)
+                print(" Optimal Result: - ", fusion_group, cost)
+                
         return cost, loop_block, loop_order, vertex_list, ilr.sfil_fit
 
     def fused_simple_cost_model(self, g, loop_block_g, loop_order_g, overlap_reuse, weight_reuse):
@@ -502,12 +502,8 @@ class ScheduleGenerator(object):
         cost_inner_g = [None for _ in g]
         cost_inner_g_ideal = [None for _ in g]
         point_g = [None for _ in g]
-        point_g_t = [None for _ in g]
         Ops_count , Input_count , Weight_count , Output_count = [None for _ in g] , [None for _ in g] , [None for _ in g] , [None for _ in g]
         t = 0
-
-        ops2 = 0
-        # if len(g) > 1 :
 
         for layer_name, loop_block, loop_order, H_recompute, H_reuse, H_epilogue_recompute, H_epilogue_reuse in zip(g, loop_block_g, loop_order_g, self.H_recompute, self.H_reuse, self.H_epilogue_recompute, self.H_epilogue_reuse):
             layer = self.network[layer_name]
@@ -557,7 +553,8 @@ class ScheduleGenerator(object):
                     height_sizes = [H_reuse] + (self.height_tile_num-2)*[H_reuse] +[H_epilogue_reuse]
                 else :
                     height_sizes = [H_reuse] + (self.height_tile_num-2)*[H_recompute] +[H_epilogue_recompute]
-            # print("  ", layer_name, height_sizes)
+            if self.debug_msg : 
+                print("  ", layer_name, height_sizes)
             R,S,C,Q,P,M,B = loop_block[0],loop_block[1],loop_block[2],loop_block[3],loop_block[4],loop_block[5],loop_block[6]
             TB = loop_block[6]
             for ith_iteration,height_size in enumerate(height_sizes):
@@ -587,14 +584,15 @@ class ScheduleGenerator(object):
                 Input_count[t] += Input_Access*Input_Size
                 Weight_count[t] += Weight_Access*Weight_Size
                 Output_count[t] += Output_Access*Output_Size
-                # if len(height_sizes) == 1 :
-                #     print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
-                # elif len(height_sizes) == 2 :
-                #     if ith_iteration == 0 or ith_iteration == 1 :
-                #         print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
-                # elif len(height_sizes) > 2 :
-                #     if ith_iteration == 0 or ith_iteration == 1 or ith_iteration == len(height_sizes) - 1 :
-                #         print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                if self.debug_msg : 
+                    if len(height_sizes) == 1 :
+                        print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                    elif len(height_sizes) == 2 :
+                        if ith_iteration == 0 or ith_iteration == 1 :
+                            print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                    elif len(height_sizes) > 2 :
+                        if ith_iteration == 0 or ith_iteration == 1 or ith_iteration == len(height_sizes) - 1 :
+                            print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
                 
             point_g[t] = None
             cost_inner_g[t] *= (B//TB)
@@ -603,7 +601,8 @@ class ScheduleGenerator(object):
             Input_count[t] *= (B//TB)
             Weight_count[t] *= (B//TB)
             Output_count[t] *= (B//TB)
-            # print("   ",layer_name,cost_inner_g[t],cost_inner_g_ideal[t] , round(cost_inner_g_ideal[t]/cost_inner_g[t],3), Ops_count[t], Input_count[t]/1024 , Weight_count[t]/1024 , Output_count[t]/1024 ,(Input_count[t]+Weight_count[t]+Output_count[t])/1024)
+            if self.debug_msg : 
+                print("   ",layer_name,cost_inner_g[t],cost_inner_g_ideal[t] , round(cost_inner_g_ideal[t]/cost_inner_g[t],3), Ops_count[t], Input_count[t]/1024 , Weight_count[t]/1024 , Output_count[t]/1024 ,(Input_count[t]+Weight_count[t]+Output_count[t])/1024)
             t += 1
 
         return cost_inner_g, cost_inner_g_ideal, Ops_count, Input_count, Weight_count, Output_count, point_g

@@ -293,12 +293,12 @@ class InterLayerReuse(object):
         # print(self.scale , self.minSize)
 
     def _init_alternate_pair_weight_iverlap_reuse_considered(self, overlap_reuse, weight_reuse):        
-        size_temp = 0
-        self._init_scale()
+        
         irrelevant = [le.D, le.R, le.K, le.C]
         self.loop_block = [None for _ in self.dag_vertex_list]
         self.loop_order = [None for _ in self.dag_vertex_list]
 
+        self._init_scale()
         self.min_feature_footprint, self.is_full_buffer, self.add_one_line_footprint , self.line_buffer_footprint = self._alternate_line_buffer_included()
 
         if self.is_full_buffer is None:
@@ -306,7 +306,7 @@ class InterLayerReuse(object):
 
         level = self.resource.buffer_levels() - 2
         total_buffer_size = self.resource.buffer(level).capacity * self. resource.paras[level].count
-        
+        size_temp = 0
         if overlap_reuse :
             reuse_buffer = self.line_buffer_footprint 
             min_feature_buffer = self.min_feature_footprint + self.line_buffer_footprint
@@ -453,182 +453,6 @@ class InterLayerReuse(object):
         
         self.q = q
         return True
-
-    # def _init_alternate_pair_optimus2(self):
-    #     size_temp = 0
-    #     overlap_reuse = True
-    #     # overlap_reuse = False
-        
-    #     self._init_scale()
-    #     irrelevant = [le.D, le.R, le.K, le.C]
-    #     self.loop_block = [None for _ in self.dag_vertex_list]
-    #     self.loop_order = [None for _ in self.dag_vertex_list]
-
-    #     self.min_feature_footprint, self.is_full_buffer, self.add_one_line_footprint , self.line_buffer_footprint = self._alternate_2()
-
-    #     if self.is_full_buffer is None:
-    #         return False
-
-    #     level = self.resource.buffer_levels() - 2
-    #     total_buffer_size = self.resource.buffer(level).capacity * self. resource.paras[level].count
-        
-    #     if overlap_reuse :
-    #         reuse_buffer = self.line_buffer_footprint 
-    #         min_feature_buffer = self.min_feature_footprint + self.line_buffer_footprint
-    #     else :
-    #         reuse_buffer = 0
-    #         min_feature_buffer = self.min_feature_footprint
-    #     if total_buffer_size <= min_feature_buffer:
-    #         return False
-          
-    #     if total_buffer_size >= min_feature_buffer + self.fused_weight_size :
-    #         self.sfil_fit = True
-    #         weight_buffer = self.fused_weight_size
-    #     else :
-    #         self.sfil_fit = False
-    #         if self.dataflow == 'OS' :
-    #             weight_buffer = 1024
-    #         elif self.dataflow == 'WS' :
-    #             weight_buffer = 1024
-    #     # self.sfil_fit = False
-    #     # weight_buffer = 1024
-    #     feature_buffer_temp = total_buffer_size - weight_buffer - reuse_buffer
-        
-    #     output_h_min = self.network.input_layer().hofm
-    #     output_w_min = self.network.input_layer().wofm
-    #     for l in self.lasts:
-    #         if self.network[l].hofm < output_h_min:
-    #             output_h_min = self.network[l].hofm
-    #         if self.network[l].wofm < output_w_min:
-    #             output_w_min = self.network[l].wofm
-
-    #     line_num = math.ceil((feature_buffer_temp - self.min_feature_footprint) / self.add_one_line_footprint)
-    #     if line_num < 1 :
-    #         return False
-        
-    #     if line_num > output_h_min:
-    #         h = output_h_min
-    #         b = int(max(feature_buffer_temp//((output_h_min-1)*self.add_one_line_footprint+self.min_feature_footprint), 
-    #                     self.network.input_layer().nimg))
-    #     else:
-    #         h = line_num
-    #         b = 1
-            
-    #     output_tile_h_min = self.network.input_layer().hofm
-    #     output_tile_h_recompute = [None for _ in self.dag_vertex_list]
-    #     output_tile_h_reuse = [None for _ in self.dag_vertex_list]
-    #     output_tile_h_epilogue_reuse = [None for _ in self.dag_vertex_list]
-    #     output_tile_h_epilogue_recompute = [None for _ in self.dag_vertex_list]
-    #     for l in reversed(self.dag_vertex_list):
-    #         idx = self.dag_vertex_dict[l]
-    #         layer = self.network[l]
-    #         if l in self.lasts:
-    #             output_tile_h_reuse[idx] = int(self.scale[idx].s_h * h)
-    #             output_tile_h_recompute[idx] = int(self.scale[idx].s_h * h)
-    #             if output_tile_h_reuse[idx] < output_tile_h_min :
-    #                 output_tile_h_min = output_tile_h_reuse[idx]
-    #             continue
-    #         h_tmp_recompute , h_tmp_reuse = None , None
-    #         for dst_idx in self.dag_next_dict[idx]:
-    #             dst = self.dag_vertex_list[dst_idx]
-    #             dst_layer = self.network[dst]
-    #             dst_h_recompute = output_tile_h_recompute[dst_idx]
-    #             dst_h_reuse = output_tile_h_reuse[dst_idx]
-    #             if isinstance(dst_layer, LocalRegionLayer):
-    #                 hreg = dst_layer.hreg
-    #             else:
-    #                 hreg = dst_layer.hfil
-    #             if h_tmp_recompute is None:
-    #                 h_tmp_recompute = min((dst_h_recompute - 1) * dst_layer.hstd + hreg, layer.hofm)
-    #                 h_tmp_reuse = min(dst_h_reuse * dst_layer.hstd , layer.hofm)
-    #             else:
-    #                 if (dst_h_recompute - 1) * dst_layer.hstd + hreg > h_tmp_recompute :
-    #                     h_tmp_recompute = min((dst_h_recompute - 1) * dst_layer.hstd + hreg, layer.hofm)
-    #                 if dst_h_reuse * dst_layer.hstd  > h_tmp_reuse :
-    #                     h_tmp_reuse = min(dst_h_reuse * dst_layer.hstd , layer.hofm)
-    #         output_tile_h_recompute[idx] = math.floor(h_tmp_recompute)
-    #         output_tile_h_reuse[idx] = math.floor(h_tmp_reuse)
-        
-    #     self.height_tile_num = math.ceil( (output_h_min/output_tile_h_min) )
-    #     self.batch_tile_num = math.ceil( self.network.input_layer().nimg/b)
-    #     self.total_tile_num = self.height_tile_num * self.batch_tile_num 
-
-    #     for l in reversed(self.dag_vertex_list):
-    #         idx = self.dag_vertex_dict[l]
-    #         layer = self.network[l]
-    #         output_tile_h_epilogue_reuse[idx] = layer.wofm - output_tile_h_reuse[idx]*\
-    #             (self.height_tile_num - 1)
-    #         output_tile_h_epilogue_recompute[idx] = output_tile_h_epilogue_reuse[idx]+\
-    #             (output_tile_h_recompute[idx] - output_tile_h_reuse[idx])
-
-    #     for l in self.dag_vertex_list:
-    #         idx = self.dag_vertex_dict[l]
-    #         layer = self.network[l]
-    #         if isinstance(layer, LocalRegionLayer):
-    #             if l in self.firsts:
-    #                 size_temp += layer.wofm * output_tile_h_recompute[idx] * layer.nofm * b
-    #             continue
-    #         c = layer.nifm
-    #         k = layer.nofm
-    #         size_temp += layer.wofm * output_tile_h_recompute[idx] * layer.nofm * b
-            
-    #         self.loop_block[idx] = [layer.wfil, layer.hfil, c, layer.wofm, output_tile_h_reuse[idx], k, b]
-    #         self.loop_order[idx] = schedule_generator.loop_order_generator(layer, self.loop_block[idx], irrelevant)
-            
-    #     print('  Buffer(total , weight, reuse , available :' , int(total_buffer_size//1024) , self.fused_weight_size//1024 , reuse_buffer//1024 , int(feature_buffer_temp//1024)) 
-    #     print('  Buffer(min_feature , one_line_size, residue) :' ,  self.min_feature_footprint//1024, self.add_one_line_footprint//1024 , h , int((feature_buffer_temp-self.min_feature_footprint-(h-1)*(self.add_one_line_footprint))//1024) )
-    #     print('  Batch , Output_Min_H, Batch_Tile(Size) , Output_H_Tile(Size) :', self.network.input_layer().nimg, output_h_min, b, h)
-    #     print('  Num of Tiles(Total,B,H) :', self.total_tile_num, self.batch_tile_num, self.height_tile_num )
-    #     self.H_recompute = output_tile_h_recompute
-    #     self.H_reuse = output_tile_h_reuse
-    #     self.H_epilogue_recompute = output_tile_h_epilogue_recompute
-    #     self.H_epilogue_reuse = output_tile_h_epilogue_reuse
-        
-    #     DRAM_Access_Cost = self.resource.access_cost[2]
-    #     Buffer_Access_Cost = self.resource.access_cost[1]
-    #     Input_DRAM_Cost , Output_DRAM_Cost , Weight_DRAM_Cost = DRAM_Access_Cost[0] , DRAM_Access_Cost[1] , DRAM_Access_Cost[2]
-    #     Input_Buffer_Cost , Output_Buffer_Cost , Weight_Buffer_Cost = Buffer_Access_Cost[0] , Buffer_Access_Cost[1] , Buffer_Access_Cost[2]
-        
-    #     input_cost = self.fused_input_size * Input_DRAM_Cost
-    #     output_cost = self.fused_output_size * Output_DRAM_Cost
-        
-    #     if self.sfil_fit == True :
-    #         weight_cost = self.fused_weight_size * (Weight_DRAM_Cost + Weight_Buffer_Cost)
-    #     elif self.sfil_fit == False :
-    #         weight_cost = self.fused_weight_size * self.height_tile_num * (Weight_DRAM_Cost + Weight_Buffer_Cost)
-    #     q = input_cost + output_cost + weight_cost
-
-    #     for l in self.dag_vertex_list:
-    #         idx = self.dag_vertex_dict[l]
-    #         layer = self.network[l]
-    #         if isinstance(layer, LocalRegionLayer):
-    #             q += (Input_Buffer_Cost *  layer.total_ifmap_size)
-    #             q += (Output_Buffer_Cost * layer.total_ofmap_size)
-    #             continue
-    #         q += (Input_Buffer_Cost *  layer.total_ifmap_size * (layer.nofm / self.loop_block[idx][5]) )
-    #         q += (Output_Buffer_Cost * layer.total_ofmap_size * (layer.nifm / self.loop_block[idx][2]) )
-
-    #     self.q = q
-    #     return True
-        # if line_num <= output_h_min:
-        #     h = line_num
-        #     b = 1
-        # elif line_num > output_h_min:
-        #     h = output_h_min
-        #     for batch in range (1,self.network.input_layer().nimg+1) :
-        #         s_temp = total_buffer_size - reuse_buffer
-        #         if s_temp <= 0 :
-        #             break
-        #         else :
-        #             line_num = math.ceil((s_temp) / batch*self.add_one_line_footprint)
-        #             if line_num < output_h_min :
-        #                 break
-        #             else :
-        #                 b = batch
-        #                 total_buffer_size = s_temp
-        # else:
-        #     h = line_num
-        #     b = 1
         
     def _init_alternate_pair_optimus(self):
         size_temp = 0
@@ -1221,12 +1045,8 @@ class InterLayerReuse(object):
         if self.d_fusion or self.z_fusion:
             return self._init_alternate_pair_others(mode)
         else:
-            # return self._init_alternate_pair_optimus3()
             return self._init_alternate_pair_optimus()
-
-    def _init_alternate_pair2(self, overlap_reuse, weight_reuse):
-        return self._init_alternate_pair_optimus3(overlap_reuse, weight_reuse)
-            
+        
     def fun(self, args):
 
         q0, q1, q2, b, output_h_min = args
@@ -1501,8 +1321,7 @@ class InterLayerReuse(object):
         min_feature_footprint, add_one_line_footprint, line_buffer_footprint = 1,1,1
 
         ext_inputs = set(self.ext_inputs_dict.keys())
-        # print(self.scale)
-        # print(self.minSize)
+        # print(self.scale,self.minSize)
         for l in self.dag_vertex_list:
             idx = self.dag_vertex_dict[l]
             layer = self.network[l]

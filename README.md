@@ -1,67 +1,24 @@
-# Optimus #
-[![DOI](https://zenodo.org/badge/364437098.svg)](https://zenodo.org/badge/latestdoi/364437098)
+HYU 2022 Fall AI System Design Final Project - Layer Fusion Optimization
 
-This is the implementation of the paper [Optimus: Towards Optimal Layer-Fusion on Deep Learning Processors], which has accepted by LCTES2021.
+This is the code of final project of HYU ECE9125 2022 Fall Semester
 
-## Getting Started Guide ##
-### Start from Source Code ###
-1. Create virtual env
-```
-conda create --name optimusEnv python=3.6
-conda activate optimusEnv
-```
-2. Install requirement
-```
-pip install -r requirements.txt
-```
-3. Run a test
-```
-./test.sh
-```
-4. To find out all the options
-```
-python ./fusion/tools/optimal_schedule_search.py --help
-```
+# Requirment #
+python==3.6
+matplotlib==3.1.1
+numpy==1.13.3
+scipy==1.4.0
 
-### Experiments ###
-1. Run overall experiment to get the memory access and energy over multiple models
-  The result will be stored in result/overall_experiment/. It will take more than ten minutes to complete this experiment.
-```
-python ./fusion/experiment/overall_experiment.py
-```
+### Getiing Started Guide ###
+1. Open Layer_Fusion_Optimization.ipynb
+2. set predefined network resnet18-B2/3/4/5
+3. set batch 1/4 (or value you want)
+4. set arch as 'fusion/arch/1024PE.json'
+5. set buffer_size_KB as you want
+6. set dataflow 'fusion/dataflow/1_weight_stationary.json' or 'fusion/dataflow/1_output_stationary.json'
+7. set DRAM_BW 1/2/4(or value you want) to check performance difference due to Memory-Bound/Coumpute-Bound issue
+8. set path as './Result'
 
-2. Run memory access analysis over multiple models
-  The result will be stored in result/analysis/. It will take more than ten minutes to complete this experiment.
-```
-python ./fusion/experiment/analysis.py
-```
-
-3. Evaluate the Impact of Batch Size
-  The result will be stored in result/batch_size/.
-```
-python ./fusion/experiment/batch_size.py
-```
-
-4. Evaluate the impact of on-chip memory space
-  The result will be stored in result/buffer_size/.
-```
-python ./fusion/experiment/buffer_size.py
-```
-
-5. Evaluate the impact of Dataflow
-  This experiment supports the experiment results of section 4.2.5 in our paper, and  the result will be stored  in result/dataflow/.
-```
-python ./fusion/experiment/dataflow.py
-```
-
-6. Evaluate the impact of PE-array and buffer
-  The result will be stored in result/pe_array/.
-```
-python ./fusion/experiment/pe_array.py
-```
-
-7. Evaluate the performance on different processors
-  The result will be stored in result/processor/.
-```
-python ./fusion/experiment/processor.py
-```
+## Reminder ##
+1. Simple per iteration bandwidth/execution cycle based performance model is used
+2. Timeloop Wraper + Cost Model is excluded from soruce code due to build/dependency issue
+3. If you are looking for Timeloop Wraper + Cost Model, Plz send e-mail to ycivil93@hanyang.ac.kr
