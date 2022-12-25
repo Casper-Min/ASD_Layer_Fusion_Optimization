@@ -17,6 +17,44 @@ from fusion.scheduling import res_parse
 from fusion.nn_models import all_networks
 from fusion.nn_models import import_network
 
+def do_scheduling_timeloop(net, batch, arch , buffer_size, dataflow, DRAM_BW, path, timeloop_cost_model=False, z_fusion=False, d_fusion=False, womincost=False, wofusion=False, wofusion_optimus=False, is_shiDianNao=False) :
+    """
+    Get optimal scheduling for given problem. Return a result schedule.
+    """
+
+    print("Layer Fusion Optimization Start")
+
+    # Resource.
+    arch_info, dataflow_info = extract_info(arch, dataflow, buffer_size)
+    resource = Resource.arch(arch_info)
+    loop_lower_bound = LoopLowerBound.dataflow(dataflow_info)
+    
+    # Network.
+    batch_size.init(batch)
+    network = import_network(net)
+    print(network)
+
+    cost_model = CostModel(network, resource)
+
+    # optimal schedule
+    sg = ScheduleGenerator(network, resource, cost_model, loop_lower_bound, dataflow_info, DRAM_BW, path, timeloop_cost_model, z_fusion, d_fusion, womincost, wofusion, wofusion_optimus, is_shiDianNao)
+    schedule_info_list, _ = sg.schedule_search()
+
+    print(schedule_info_list ,'\n')\
+        
+    others = False
+    is_access = True
+    if ((z_fusion == True) and (womincost == True)) or (wofusion == True) :
+         others = True
+    
+    # result parsing
+    cost, access = res_parse(schedule_info_list,
+                        resource, cost_model,
+                        sg, network,
+                        loop_lower_bound,
+                        path, arch_info, others, is_access)
+
+    return schedule_info_list, cost
 
 def do_scheduling(args):
     """

@@ -105,7 +105,7 @@ class Resource(object):
         # LMEI always assume square-shape array, could change later
         array_width = [para_count_list[i] if array_dim[i] == 1 else int(math.sqrt(para_count_list[i])) for i in
                        range(self.num_levels)]
-
+        self.array_width = array_width[0]
         self.paras = [Parallelism(*t) for t in zip(para_count_list,
                                                    partition_mode, array_access_costs, array_dim, array_width)]
         self.access_cost = buf_access_cost_list

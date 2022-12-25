@@ -215,7 +215,23 @@ class ConvLayer(Layer):
     def ops_per_neuron(self):
         # 2D convolution across all ifmap channels.
         return self.hfil * self.wfil * self.nifm
+    
+    @property
+    def ifmap_size_timeloop_simple_cost(self):
+        """
+        Get size of one input fmap.
+        """
+        hifm = self.hfil + (self.hofm - 1) * self.hstd
+        wifm = self.wfil + (self.wofm - 1) * self.wstd
+        return hifm * wifm * self.nimg
 
+    @property
+    def total_ifmap_size_timeloop_simple_cost(self):
+        """
+        Get total size of all input fmaps.
+        """
+        return self.nifm * self.ifmap_size_timeloop_simple_cost
+    
     @property
     def filter_size(self):
         """

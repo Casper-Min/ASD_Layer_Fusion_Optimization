@@ -1,7 +1,7 @@
 {
     "mem_levels": 3,
     "capacity":[36, 196608, 1073741824],
-    "access_cost":[0.1, 6, 200],
+    "access_cost":[0.05, 12, 200],
     "static_cost":[0, 0, 0],
     "parallel_count":[1024 , 1, 1],
     "mac_capacity":0,

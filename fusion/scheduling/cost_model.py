@@ -3,6 +3,7 @@ cost model
 """
 import numpy as np
 from operator import mul, add
+import math
 
 from . import loop_enum as le
 from .layer import ConvLayer
@@ -44,12 +45,14 @@ class CostModel(object):
         r_exclusive = point.loop_orders[le.D][level] < ex_order_index
         d_exclusive = point.loop_orders[le.R][level] < ex_order_index
         k_exclusive = point.loop_orders[le.K][level] < ex_order_index
-
+        
         rdk_acc = (layer.wfil * layer.hfil * layer.nofm) / \
-                  (point.loop_blockings[le.D][level - 1 + r_exclusive]
-                   * point.loop_blockings[le.R][level - 1 + d_exclusive]
+                  (point.loop_blockings[le.D][level - 1 + d_exclusive]
+                   * point.loop_blockings[le.R][level - 1 + r_exclusive]
                    * point.loop_blockings[le.K][level - 1 + k_exclusive])
-
+        # print(point.loop_blockings)
+        # print(point.loop_orders, ex_order_index, r_exclusive,d_exclusive,k_exclusive)
+        # print(point.loop_blockings[le.D][level - 1 + d_exclusive], point.loop_blockings[le.R][level - 1 + r_exclusive], point.loop_blockings[le.K][level - 1 + k_exclusive], rdk_acc)
         if point.loop_blockings[le.D][level - 1 + r_exclusive] < layer.wfil:
             rdk_acc /= layer.wstd
         if point.loop_blockings[le.R][level - 1 + d_exclusive] < layer.hfil:
@@ -146,12 +149,39 @@ class CostModel(object):
         level_access = [self.get_if_access(level, point, layer, mac_capacity),
                         2 * self.get_of_access(level, point, layer, mac_capacity) - 1,
                         self.get_fl_access(level, point, layer, mac_capacity)]
-
+        
         buffer_access_one_layer = list(map(mul, level_access, layer_size))
+        # if level == 2 :
+        #     print(level, level_access , buffer_access_one_layer)
         buffer_access_one_layer = np.ceil(buffer_access_one_layer).astype(int).tolist()
 
         return buffer_access_one_layer
 
+    def get_level_access_unilayer_and_innerlevel_timeloop_simple_cost(self, point_list, fusion_group, level):
+        """
+        Get the energy from current level of memory access
+        """
+        buffer_access = list([0, 0, 0])
+        for point, layer_name in zip(point_list, fusion_group):
+            layer = self.network[layer_name]
+            if not isinstance(layer, ConvLayer):
+                continue
+            buffer_access_one_layer = self.get_level_access_unilayer_timeloop_simple_cost(point, layer, level)
+            buffer_access = list(map(add, buffer_access_one_layer, buffer_access))
+
+        return buffer_access
+
+    def get_level_access_unilayer_timeloop_simple_cost(self, point, layer, level):
+        layer_size = self.get_layer_size(layer)
+        mac_capacity = self.resource.mac_capacity
+
+        level_access = [self.get_if_access(level, point, layer, mac_capacity),
+                        2 * self.get_of_access(level, point, layer, mac_capacity) - 1,
+                        self.get_fl_access(level, point, layer, mac_capacity)]
+        
+        return level_access
+    
+    
     def get_level_access_multilayer(self, point_list, fusion_group, level, is_filter_fit=False):
 
         assert level == self.resource.buffer_levels() - 1
@@ -161,12 +191,20 @@ class CostModel(object):
 
         ext_outputs = set()
         ext_inputs = set()
+        tile_num = 1
+        if is_filter_fit == False :
+            for point, layer_name in zip(point_list, fusion_group):
+                layer = self.network[layer_name]
+                if isinstance(layer, ConvLayer):
+                    tile_num_temp = math.ceil(layer.hofm/point.loop_blockings[le.H][1])
+                    if tile_num_temp > tile_num :
+                        tile_num = tile_num_temp
         for point, layer_name in zip(point_list, fusion_group):
             layer = self.network[layer_name]
             if isinstance(layer, ConvLayer):
                 fuse_filter_access += \
                     layer.total_filter_size \
-                    * (1 if is_filter_fit else self.get_fl_access(level, point, layer, mac_capacity))
+                    * (1 if is_filter_fit else tile_num)
             for nx in self.network.nexts(layer_name):
                 if nx not in fusion_group:
                     ext_outputs.add(layer_name)
@@ -281,6 +319,7 @@ class CostModel(object):
         access_list = []
         for level in range(num_levels):
             buffer_access = self.get_level_access(point_list, fusion_group, level, is_filter_fit)
+            # print(level,buffer_access)
             access_list.append(buffer_access)
 
         return access_list
@@ -312,4 +351,4 @@ class CostModel(object):
                 for i in range(len(array_access)):
                     noc_cost += sum(array_access[i]) * array_cost[i]
 
-        return access_list, levels_cost_breakdown, noc_cost, ops, sum(levels_cost)+noc_cost+ops
+        return access_list, levels_cost_breakdown, noc_cost, ops, sum(levels_cost)+noc_cost+0.56*ops

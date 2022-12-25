@@ -3,7 +3,7 @@ import json
 from . import loop_enum as le
 
 
-def extract_arch_info(arch_file):
+def extract_arch_info(arch_file, buffer_size=None):
     with open(arch_file) as json_data_file:
         data = json.load(json_data_file)
     assert data["mem_levels"] == len(data["capacity"]), \
@@ -17,6 +17,9 @@ def extract_arch_info(arch_file):
         data["precision"] = 16
     num_bytes = data["precision"] / 8
 
+    if buffer_size != None :
+        data["capacity"][1] = buffer_size * 1024
+        
     if type(data["capacity"][0]) is list:
         capacity_list = [[x / num_bytes for x in data["capacity"][i]] for i in range(len(data["capacity"]))]
     else:
@@ -73,8 +76,8 @@ def extract_dataflow_info(dataflow_file):
     return data
 
 
-def extract_info(arch, dataflow):
-    arch_info = extract_arch_info(arch)
+def extract_info(arch, dataflow, buffer_size=None):
+    arch_info = extract_arch_info(arch, buffer_size)
     dataflow_info = extract_dataflow_info(dataflow) if dataflow else None
 
     return arch_info,  dataflow_info
