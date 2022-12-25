@@ -1,5 +1,4 @@
-HYU 2022 Fall AI System Design Final Project - Layer Fusion Optimization
-
+# HYU 2022 Fall AI System Design Final Project - Layer Fusion Optimization #
 This is the code of final project of HYU ECE9125 2022 Fall Semester
 
 ## Requirment ##
