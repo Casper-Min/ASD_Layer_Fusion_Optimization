@@ -104,7 +104,7 @@ class ScheduleGenerator(object):
         nx = self._next(fusion_group)
         if len(g) > 0:
             if dpkey in dptable:
-                # print(dptable[dpkey])
+                print(dptable[dpkey])
                 schedule, g_cost = dptable[dpkey]
                 vertex_list, loop_block, loop_order, cost, sfil_fit = self._find_schedule(g)
                 if g_cost == float("inf"):
@@ -294,8 +294,8 @@ class ScheduleGenerator(object):
             cost_t = int(cost_t) if cost_t != float('inf') else cost_t
 
             if cost_t != float('inf') :
-                # if self.debug_msg : 
-                #     print(" DRAM-Buffer Mapping:", loop_block_t, loop_order_t, self.mapping_t, "Optimus Simple:", cost_t)
+                if self.debug_msg : 
+                    print(" DRAM-Buffer Mapping:", loop_block_t, loop_order_t, self.mapping_t, "Optimus Simple:", cost_t)
                 
                 # if self.simple_cost_model :
                 cost_inner_list, point_list = self.mapping_timeloop([g],[loop_block_t],[loop_order_t])
@@ -317,7 +317,7 @@ class ScheduleGenerator(object):
                 Result_Cycle = max(Execution_Cycle,READ_CYCLE,WRITE_CYCLE)
                 
                 if self.debug_msg : 
-                    print(" DRAM-Buffer Mapping:", loop_block_t, loop_order_t, self.mapping_t, "Optimus Simple:", Result_Cycle)
+                    print("     ", DRAM_access, Result_Cycle, Execution_Cycle, READ_CYCLE, WRITE_CYCLE)
                 
                 if not self.simple_cost_model :
                     
@@ -451,79 +451,110 @@ class ScheduleGenerator(object):
                 return self._find_uni_layer_schedule_optimus(g)
 
     def _find_multi_layer_schedule(self, fusion_group, mode):
-
         if self.timeloop_cost_model :
-            counter1 = 0
-            
-            if self.wofusion:
-                return float('inf'), None, None, None, False
-
             cost = float('inf')
-            sfil_fit = False
             input_size_t , weight_size_t , output_size_t = float('inf') , float('inf')  , float('inf')
             
+            ilr = InterLayerReuse(self.network, fusion_group, self.resource, self.dataflow, self.loop_lower_bound, z_fusion=self.z_fusion, d_fusion=self.d_fusion, womincost=self.womincost)
+            
+            if not ilr.valid or self.wofusion:
+                return float('inf'), None, None, None, False
+            
+            # self.firsts , self.lasts, self.network_prevs , vertex_list = ilr.firsts , ilr.lasts , ilr.network.prevs , ilr.dag_vertex_list
+            # self.heads , self.tails, self.bodys, self.singles = [] , [] , [] , []
+            # ext_input_list , first_list , ext_output_list , ext_output_list , last_list = [] , [] , [] , [] , []
+            
+            # for ll in self.firsts :
+            #     input_layer = self.network_prevs(ll)
+            #     if input_layer not in ext_input_list :
+            #         ext_input_list.append(input_layer)
+            #         first_list.append(ll)
+            # self.heads = first_list
+            
+            # for ll in self.lasts :
+            #     if isinstance(self.network[ll], LocalRegionLayer) :
+            #         for candidate in self.network_prevs(ll) :
+            #             if (candidate is not None) and (candidate in vertex_list) and (isinstance(self.network[candidate], ConvLayer)):
+            #                 if (ll not in ext_output_list) and (candidate not in last_list) :
+            #                     ext_output_list.append(ll)
+            #                     last_list.append(candidate)
+            # self.tails = ilr.lasts
+            
+            # for candidate_layer1 in last_list :
+            #     if candidate_layer1 not in self.tails :
+            #         self.tails.append(candidate_layer1)
+            
+            # for candidate_layer2 in self.heads :
+            #     if candidate_layer2 in self.tails :
+            #         self.singles.append(candidate_layer2)
+            
+            # # fusion gorup with only single layers
+            # if sorted(self.singles) == sorted(vertex_list) :
+            #     return float('inf'), None, None, None, False
+            
+            # for candidate_layer_singlelayer in self.singles :
+            #     self.heads.remove(candidate_layer_singlelayer)
+            #     self.tails.remove(candidate_layer_singlelayer)
+                
+            # for candidate_layers_body in vertex_list :
+            #     if (candidate_layers_body not in self.heads) and (candidate_layers_body not in self.tails) and (candidate_layers_body not in self.singles) :
+            #         self.bodys.append(candidate_layers_body)
+            
+            # print("Multi Layer Schedule", fusion_group ,"-> Head :" , self.heads , ", Body :" , self.bodys , ", Tail :" , self.tails , ", Single :" , self.singles)
+            # print(ilr.firsts , ilr.lasts)
             for weight_reuse in [True, False] :
                 for overlap_reuse in [True, False] :
-                    
-                    ilr = InterLayerReuse(self.network, fusion_group, self.resource, self.dataflow, self.loop_lower_bound, z_fusion=self.z_fusion, d_fusion=self.d_fusion, womincost=self.womincost , timeloop_cost_model=self.timeloop_cost_model)
-                    
-                    if not ilr.valid2 :
-                        break
-                    
                     ilr.sched_timeloop_cost_model(overlap_reuse,weight_reuse)
                     
-                    if ilr.total_tile_num < 1 :
-                        continue
-                    if (overlap_reuse == 1) and (ilr.total_tile_num == 1) :
-                        continue
-                    
                     self.firsts , self.lasts, self.network_prevs , vertex_list = ilr.firsts , ilr.lasts , ilr.network.prevs , ilr.dag_vertex_list
-                    self.heads , self.tails, self.bodys, self.single_layers = [] , [] , [] , []
-                    ext_input_list , first_list , ext_output_list , ext_output_list , last_list = [] , [] , [] , [] , []
-                    self.prevs1 = ilr.network.prevs
-                    
+                    self.heads , self.tails, self.bodys, self.singles = [] , [] , [] , []
                     ext_input_list , first_list , ext_output_list , ext_output_list , last_list = [] , [] , [] , [] , []
                     
                     for ll in self.firsts :
-                        input_layer = self.prevs1(ll)
+                        input_layer = self.network_prevs(ll)
                         if input_layer not in ext_input_list :
                             ext_input_list.append(input_layer)
                             first_list.append(ll)
-                    self.firsts = first_list
+                    self.heads = first_list
                     
                     for ll in self.lasts :
                         if isinstance(self.network[ll], LocalRegionLayer) :
-                            for candidate in self.prevs1(ll) :
+                            for candidate in self.network_prevs(ll) :
                                 if (candidate is not None) and (candidate in vertex_list) and (isinstance(self.network[candidate], ConvLayer)):
                                     if (ll not in ext_output_list) and (candidate not in last_list) :
                                         ext_output_list.append(ll)
                                         last_list.append(candidate)
-                                        
+                    self.tails = ilr.lasts
+                    
                     for candidate_layer1 in last_list :
-                        if candidate_layer1 not in self.lasts :
-                            self.lasts.append(candidate_layer1)
+                        if candidate_layer1 not in self.tails :
+                            self.tails.append(candidate_layer1)
                     
-                    self.single_layers = []
-                    for candidate_layer2 in self.firsts :
-                        if candidate_layer2 in self.lasts :
-                            self.single_layers.append(candidate_layer2)
-                    for candidate_layer_singlelayer in self.single_layers :
-                        self.firsts.remove(candidate_layer_singlelayer)
-                        self.lasts.remove(candidate_layer_singlelayer)
+                    for candidate_layer2 in self.heads :
+                        if candidate_layer2 in self.tails :
+                            self.singles.append(candidate_layer2)
                     
-                    self.bodys = []
+                    # fusion gorup with only single layers
+                    if sorted(self.singles) == sorted(vertex_list) :
+                        return float('inf'), None, None, None, False
+                    
+                    for candidate_layer_singlelayer in self.singles :
+                        self.heads.remove(candidate_layer_singlelayer)
+                        self.tails.remove(candidate_layer_singlelayer)
+                        
                     for candidate_layers_body in vertex_list :
-                        if (candidate_layers_body not in self.firsts) and (candidate_layers_body not in self.lasts) and (candidate_layers_body not in self.single_layers) :
+                        if (candidate_layers_body not in self.heads) and (candidate_layers_body not in self.tails) and (candidate_layers_body not in self.singles) :
                             self.bodys.append(candidate_layers_body)
                     
-
-                     
-                    if sorted(self.single_layers) == sorted(vertex_list) :
+                    print("Multi Layer Schedule", fusion_group ,"-> Head :" , self.heads , ", Body :" , self.bodys , ", Tail :" , self.tails , ", Single :" , self.singles)
+                    print(ilr.firsts , ilr.lasts)
+            
+                    print(weight_reuse,overlap_reuse,ilr.total_tile_num)
+                    if ilr.total_tile_num < 1 :
+                        # print(0)
                         continue
-
-                    if counter1 == 0 :
-                        print("Multi Layer Schedule", fusion_group ,"-> Head :" , self.firsts , ", Body :" , self.bodys , ", Tail :" , self.lasts , ", Single :" , self.single_layers)
-                        counter1 += 1
+                    if (overlap_reuse == 1) and (ilr.total_tile_num == 1) :
+                        continue
                     
                     cost_initial , cost_optimus , cost_timeloop, cost_ideal = 0 , 0 , 0 , 0
                     cost_initial, loop_block, loop_order, vertex_list = ilr.q, ilr.loop_block, ilr.loop_order, ilr.dag_vertex_list
@@ -538,7 +569,6 @@ class ScheduleGenerator(object):
                     weight_size = self.batch_tile_num * sum(weight_size_list)
                     output_size = self.batch_tile_num * sum(output_size_list) 
                     ops_count = self.batch_tile_num * sum(ops_count_list)
-                    
                     if self.debug_msg : 
                         print(vertex_list, "Reuse(Overlap/Weight):", overlap_reuse, weight_reuse , "Performance Cost:",cost_timeloop , round(cost_ideal/cost_timeloop,3) , 'I/W/O:', input_size/1024 , weight_size/1024 , output_size/1024, (input_size+weight_size+output_size)/1024,'\n')
                     if cost_timeloop < cost :
@@ -548,12 +578,10 @@ class ScheduleGenerator(object):
                         input_size_t = input_size
                         weight_size_t = weight_size
                         output_size_t = output_size
-                        
-                        
+                        self.sfil_fit = ilr.sfil_fit
             if cost == float('inf') :
                 return float('inf'), None, None, None, False
             else :
-                sfil_fit = weight_reuse_t
                 print(" Optimal Result: - Reuse(Overlap/Weight):", overlap_reuse_t, weight_reuse_t , ", Performance Cost:",cost , ', Access(I/W/O/Total, KB):', input_size_t/1024 , weight_size_t/1024 , output_size_t/1024 , (input_size_t+weight_size_t+output_size_t)/1024)
         else :
             ilr = InterLayerReuse(self.network, fusion_group, self.resource, self.dataflow, self.loop_lower_bound,
@@ -572,8 +600,8 @@ class ScheduleGenerator(object):
             else :
                 cost, loop_block, loop_order, vertex_list = ilr.q, ilr.loop_block, ilr.loop_order, ilr.dag_vertex_list
                 print(" Optimal Result: - ", fusion_group, cost)
-                sfil_fit = ilr.sfil_fit
-        return cost, loop_block, loop_order, vertex_list, sfil_fit
+                
+        return cost, loop_block, loop_order, vertex_list, ilr.sfil_fit
 
     def fused_simple_cost_model(self, g, loop_block_g, loop_order_g, overlap_reuse, weight_reuse):
 
@@ -634,8 +662,8 @@ class ScheduleGenerator(object):
             R,S,C,Q,P,M,B = loop_block[0],loop_block[1],loop_block[2],loop_block[3],loop_block[4],loop_block[5],loop_block[6]
             TB = loop_block[6]
             
-            # if self.debug_msg : 
-            #     print("  ", layer_name, height_sizes , loop_block)
+            if self.debug_msg : 
+                print("  ", layer_name, height_sizes , loop_block)
                 
             for ith_iteration,height_size in enumerate(height_sizes):
                 if weight_reuse == 1 :
@@ -670,15 +698,15 @@ class ScheduleGenerator(object):
                 Input_count[t] += Input_Access*Input_Size
                 Weight_count[t] += Weight_Access*Weight_Size
                 Output_count[t] += Output_Access*Output_Size
-                # if self.debug_msg : 
-                #     if len(height_sizes) == 1 :
-                #         print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
-                #     elif len(height_sizes) == 2 :
-                #         if ith_iteration == 0 or ith_iteration == 1 :
-                #             print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
-                #     elif len(height_sizes) > 2 :
-                #         if ith_iteration == 0 or ith_iteration == 1 or ith_iteration == len(height_sizes) - 1 :
-                #             print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                if self.debug_msg : 
+                    if len(height_sizes) == 1 :
+                        print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                    elif len(height_sizes) == 2 :
+                        if ith_iteration == 0 or ith_iteration == 1 :
+                            print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
+                    elif len(height_sizes) > 2 :
+                        if ith_iteration == 0 or ith_iteration == 1 or ith_iteration == len(height_sizes) - 1 :
+                            print("   Output :", TB,'*',TP,'*',Q,'*',M , "Input :", TB,'*',TW,'*',TP,'*',C ,"Weight:",  M,'*',R,'*',S,'*',C , Execution_Cycle, READ_CYCLE , WRITE_CYCLE)
                 
             point_g[t] = None
             cost_inner_g[t] *= (B//TB)
@@ -688,7 +716,7 @@ class ScheduleGenerator(object):
             Weight_count[t] *= (B//TB)
             Output_count[t] *= (B//TB)
             if self.debug_msg : 
-                print("   ",layer_name, cost_inner_g[t] ,'    ',cost_inner_g_ideal[t] , round(cost_inner_g_ideal[t]/cost_inner_g[t],3), Ops_count[t], Input_count[t]/1024 , Weight_count[t]/1024 , Output_count[t]/1024 ,(Input_count[t]+Weight_count[t]+Output_count[t])/1024)
+                print("   ",layer_name,cost_inner_g[t],cost_inner_g_ideal[t] , round(cost_inner_g_ideal[t]/cost_inner_g[t],3), Ops_count[t], Input_count[t]/1024 , Weight_count[t]/1024 , Output_count[t]/1024 ,(Input_count[t]+Weight_count[t]+Output_count[t])/1024)
             t += 1
 
         return cost_inner_g, cost_inner_g_ideal, Ops_count, Input_count, Weight_count, Output_count, point_g
@@ -914,9 +942,7 @@ class ScheduleGenerator(object):
         
         Total_Energy, DRAM_Energy, MAC_Util, EnergyperMAC, Ideal_Cycle, Slowdown, Total_Cycle_Timeloop = 0,0,0,0,0,0,0
         
-        # path1 = self.path + "/" + self.dataflow + "/" + self.DRAM_BW + "/" + self.dataflow + "/" + self.dataflow
-        # print(self.path + "/" + self.network.net_name + "/" + self.dataflow + "/BW" + str(self.DRAM_BW) + "/" + str(int(self.resource.buffer(1).capacity//1024)))
-        path1 = self.path + "/" + self.network.net_name + "/" + str(layer.nimg) + "/" + self.dataflow + "/BW" + str(self.DRAM_BW) + "/" + str(int(self.resource.buffer(1).capacity//1024))
+        path1 = self.path + "/" + self.dataflow
         if not os.path.exists(path1):
             os.makedirs(path1)
         os.chdir(path1)

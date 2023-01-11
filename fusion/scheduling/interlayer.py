@@ -23,7 +23,7 @@ class InterLayerReuse(object):
     MinSize = namedtuple('MinSize', ['h', 'w'])
 
     def __init__(self, network, fusion_group, resource, dataflow, loop_lower_bound, topological_order=True,
-                 z_fusion=False, d_fusion=False, womincost=True):
+                 z_fusion=False, d_fusion=False, womincost=True, timeloop_cost_model=False):
         if not isinstance(network, Network):
             raise TypeError('InterLayerReuse: network must be '
                             'a Network instance.')
@@ -44,16 +44,22 @@ class InterLayerReuse(object):
         self.z_fusion = z_fusion
         self.d_fusion = d_fusion
         self.womincost = womincost
+        self.timeloop_cost_model = timeloop_cost_model
         self.dataflow = dataflow
         self.height_tile_num = 0
         self.batch_tile_num = 0
         self.total_tile_num = 0
 
-        self.valid = self._prepare()
-        if not self.valid:
-            return
+        if self.timeloop_cost_model :
+            self.valid2 = self._prepare()
+            if not self.valid2:
+                return
+        else :
+            self.valid = self._prepare()
+            if not self.valid:
+                return
 
-        self._calc_sched_dag()
+        # self._calc_sched_dag()
         
         # self.valid = self._init_alternate_pair()
         # if not self.valid:
@@ -65,10 +71,10 @@ class InterLayerReuse(object):
             self.valid = self._init_alternate_pair(mode)
 
     def sched_timeloop_cost_model(self, overlap_reuse=True, weight_reuse=True):
-        if self.valid:
-            self._calc_sched_dag()
-            self.valid = self._init_alternate_pair_weight_iverlap_reuse_considered(overlap_reuse,weight_reuse)
-            
+        # if self.valid:
+        self._calc_sched_dag()
+        self.valid = self._init_alternate_pair_weight_iverlap_reuse_considered(overlap_reuse,weight_reuse)
+
     def _prepare(self):
         self.firsts = []
         self.lasts = []
@@ -89,14 +95,17 @@ class InterLayerReuse(object):
             tmp = tuple()
             for nx in self.network.nexts(layer):
                 if nx not in self.fusion_group:
+                    # print(layer, nx)
                     tmp += (nx, )
                     self.ext_outputs.add(layer)
+                    # self.lasts.append(layer)
             if tmp == self.network.nexts(layer):
                 self.lasts.append(layer)
-
+            
             tmp = tuple()
             for pre in self.network.prevs(layer):
                 if pre not in self.fusion_group:
+                    # print(layer, pre)
                     tmp += (pre, )
                     if pre not in self.ext_inputs_dict:
                         self.ext_inputs_dict[pre] = [layer]
@@ -106,6 +115,7 @@ class InterLayerReuse(object):
                 if isinstance(self.network[layer], LocalRegionLayer):
                     return False
                 self.firsts.append(layer)
+                
             if isinstance(self.network[layer], ConvLayer):
                 self.fused_weight_size += self.network[layer].total_filter_size
                 self.Required_Buffer_Weight_Full_Reuse_WS = self.resource.paras[0].count
@@ -237,10 +247,11 @@ class InterLayerReuse(object):
             last_w.append(scale_tmp[idx][1])
         s_h = util.lcm(*last_h)
         s_w = util.lcm(*last_w)
-
+        # print(s_h,s_w)
         for l in reversed(self.dag_vertex_list):
             idx = self.dag_vertex_dict[l]
             if l in self.lasts:
+                # print(l)
                 self.scale[idx] = \
                     InterLayerReuse.Scale(s_h / scale_tmp[idx][0], s_w / scale_tmp[idx][1])
                 continue
@@ -302,6 +313,7 @@ class InterLayerReuse(object):
         self.min_feature_footprint, self.is_full_buffer, self.add_one_line_footprint , self.line_buffer_footprint = self._alternate_line_buffer_included()
 
         if self.is_full_buffer is None:
+            # print(1)
             return False
 
         level = self.resource.buffer_levels() - 2
@@ -315,6 +327,7 @@ class InterLayerReuse(object):
             min_feature_buffer = self.min_feature_footprint
             
         if total_buffer_size <= min_feature_buffer:
+            # print(2)
             return False
 
         if weight_reuse :
@@ -322,6 +335,7 @@ class InterLayerReuse(object):
                 self.sfil_fit = True
                 weight_buffer = self.fused_weight_size
             else :
+                # print(3)
                 return False
         else :
             self.sfil_fit = False
@@ -341,8 +355,9 @@ class InterLayerReuse(object):
                 output_w_min = self.network[l].wofm
 
         line_num = math.ceil((feature_buffer_temp - self.min_feature_footprint) / self.add_one_line_footprint)
-        
+        # print(line_num)
         if line_num < 1 :
+            # print(4)
             return False
         
         if line_num > output_h_min:

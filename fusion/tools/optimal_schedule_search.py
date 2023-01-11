@@ -17,7 +17,7 @@ from fusion.scheduling import res_parse
 from fusion.nn_models import all_networks
 from fusion.nn_models import import_network
 
-def do_scheduling_timeloop(net, batch, arch , buffer_size, dataflow, DRAM_BW, path, timeloop_cost_model=False, z_fusion=False, d_fusion=False, womincost=False, wofusion=False, wofusion_optimus=False, is_shiDianNao=False) :
+def do_scheduling_timeloop(net, batch, arch , buffer_size, dataflow, DRAM_BW, path, timeloop_cost_model=False, z_fusion=False, d_fusion=False, womincost=False, wofusion=False, wofusion_optimus=False, is_shiDianNao=False, simple_cost_model=True) :
     """
     Get optimal scheduling for given problem. Return a result schedule.
     """
@@ -37,7 +37,7 @@ def do_scheduling_timeloop(net, batch, arch , buffer_size, dataflow, DRAM_BW, pa
     cost_model = CostModel(network, resource)
 
     # optimal schedule
-    sg = ScheduleGenerator(network, resource, cost_model, loop_lower_bound, dataflow_info, DRAM_BW, path, timeloop_cost_model, z_fusion, d_fusion, womincost, wofusion, wofusion_optimus, is_shiDianNao)
+    sg = ScheduleGenerator(network, resource, cost_model, loop_lower_bound, dataflow_info, DRAM_BW, path, timeloop_cost_model, z_fusion, d_fusion, womincost, wofusion, wofusion_optimus, is_shiDianNao, simple_cost_model)
     schedule_info_list, _ = sg.schedule_search()
 
     print(schedule_info_list ,'\n')\
@@ -54,7 +54,7 @@ def do_scheduling_timeloop(net, batch, arch , buffer_size, dataflow, DRAM_BW, pa
                         loop_lower_bound,
                         path, arch_info, others, is_access)
 
-    return schedule_info_list, cost
+    return schedule_info_list, cost, access
 
 def do_scheduling(args):
     """

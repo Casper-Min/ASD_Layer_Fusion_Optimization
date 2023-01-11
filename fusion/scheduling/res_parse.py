@@ -111,7 +111,8 @@ def res_parse(schedule_info_list, resource, cost_model, sg, network,
                 u = utilization_p / total_ops_p
                 alu += total_ops_p / u
 
-    access = off_chip_overall * resource.precision / 8 / 1024 / 1024
+    # access = off_chip_overall * resource.precision / 8 / 1024 / 1024
+    access = int(off_chip_overall * resource.precision / 8 / 1024)
     energy = total_cost / 1e10
     costs[4] = 0.56*alu
     for i in range(5):
